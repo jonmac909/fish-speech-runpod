@@ -5,8 +5,8 @@ FROM fishaudio/fish-speech:latest
 
 WORKDIR /app
 
-# Install runpod (the only additional dependency)
-RUN pip install --no-cache-dir runpod>=1.6.0
+# Install runpod (try pip first, fall back to uv)
+RUN pip install --no-cache-dir runpod>=1.6.0 || uv pip install --system runpod>=1.6.0
 
 # Copy handler
 COPY handler.py .
