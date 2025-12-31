@@ -12,15 +12,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     ffmpeg \
     libsndfile1 \
+    build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
+# Install Python dependencies (git must be available for GitHub installs)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Download Fish Speech model weights
-RUN pip install huggingface_hub && \
-    python -c "from huggingface_hub import snapshot_download; snapshot_download('fishaudio/openaudio-s1-mini', local_dir='/app/checkpoints/openaudio-s1-mini')"
+RUN python -c "from huggingface_hub import snapshot_download; snapshot_download('fishaudio/openaudio-s1-mini', local_dir='/app/checkpoints/openaudio-s1-mini')"
 
 # Copy handler
 COPY handler.py .

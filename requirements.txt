@@ -1,11 +1,10 @@
-# Fish Speech TTS dependencies
-fish-speech>=1.5.0
+# Fish Speech TTS dependencies - install from GitHub (PyPI version is outdated)
+git+https://github.com/fishaudio/fish-speech.git@main
 runpod>=1.6.0
 
 # Audio processing
 torchaudio>=2.1.0
 soundfile>=0.12.0
-librosa>=0.10.0
 
 # Utilities
 numpy>=1.24.0
