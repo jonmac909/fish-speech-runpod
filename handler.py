@@ -86,7 +86,7 @@ def load_models():
         checkpoint_path=CHECKPOINT_PATH,
         device=DEVICE,
         precision=precision,
-        compile_model=COMPILE_MODEL,
+        compile=COMPILE_MODEL,
     )
     print("LLAMA model loaded")
 
