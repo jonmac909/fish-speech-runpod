@@ -48,7 +48,7 @@ ensure_model_downloaded()
 
 # Fish Speech imports (after model download)
 from fish_speech.inference_engine import TTSInferenceEngine
-from fish_speech.models.dac.modded_dac import ModdedDACModel
+from fish_speech.models.dac.inference import load_model as load_decoder_model
 from fish_speech.models.text2semantic.inference import launch_thread_safe_queue
 from fish_speech.utils.schema import ServeTTSRequest, ServeReferenceAudio
 
@@ -91,12 +91,11 @@ def load_models():
     print("LLAMA model loaded")
 
     # Load decoder (semantic-to-audio) model
-    decoder_model = ModdedDACModel.load(
+    decoder_model = load_decoder_model(
         config_name=DECODER_CONFIG,
         checkpoint_path=DECODER_CHECKPOINT,
         device=DEVICE,
     )
-    decoder_model.eval()
     print(f"Decoder model loaded, sample rate: {decoder_model.sample_rate}")
 
     # Create TTS inference engine
