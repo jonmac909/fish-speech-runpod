@@ -8,14 +8,11 @@ USER root
 
 WORKDIR /app
 
-# Install runpod and huggingface_hub into the venv using uv
-RUN uv pip install --python /app/.venv/bin/python runpod>=1.6.0 huggingface_hub
+# Install runpod into the venv using uv
+RUN uv pip install --python /app/.venv/bin/python runpod>=1.6.0
 
-# Download model weights at build time (not runtime)
-# This bakes the ~2GB model into the Docker image
-ARG HF_TOKEN
-ENV HF_TOKEN=${HF_TOKEN}
-RUN /app/.venv/bin/python -c "from huggingface_hub import snapshot_download; snapshot_download('fishaudio/openaudio-s1-mini', local_dir='/app/checkpoints/openaudio-s1-mini', token='${HF_TOKEN}')"
+# Copy pre-downloaded model weights (downloaded locally to avoid HF xethub issues)
+COPY checkpoints/openaudio-s1-mini /app/checkpoints/openaudio-s1-mini
 
 # Copy handler
 COPY handler.py .
