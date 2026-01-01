@@ -24,6 +24,7 @@ import os
 import tempfile
 import traceback
 
+import numpy as np
 import torch
 import torchaudio
 
@@ -199,44 +200,77 @@ def handler(job):
                 references = []
 
         # Build TTS request
+        # Fixed seed for deterministic output (0 = random, any other = deterministic)
+        # Lower temperature and top_p for more consistent voice/accent
         request = ServeTTSRequest(
             text=text,
             references=references,
-            temperature=0.7,
-            top_p=0.8,
+            temperature=0.5,
+            top_p=0.7,
             repetition_penalty=1.2,
-            max_new_tokens=1024,
+            max_new_tokens=2048,
             normalize=True,
             format="wav",
-            chunk_length=200,
+            chunk_length=300,  # Larger chunks = fewer transitions
+            seed=42,  # Fixed seed for consistent voice
         )
 
         # Generate audio using inference engine
+        # Fish Speech yields InferenceResult with audio = (sample_rate, numpy_array)
         audio_segments = []
+        result_sample_rate = None
+
         for result in tts_engine.inference(request):
             if hasattr(result, 'audio') and result.audio is not None:
-                # Convert float audio to int16
-                audio_data = (result.audio * AMPLITUDE).to(torch.int16)
-                audio_segments.append(audio_data)
+                audio_data = result.audio
+
+                # Fish Speech returns (sample_rate, numpy_array) tuple
+                if isinstance(audio_data, tuple) and len(audio_data) == 2:
+                    sr, audio_np = audio_data
+                    if result_sample_rate is None:
+                        result_sample_rate = sr
+                    # audio_np is a numpy array (float32)
+                    if isinstance(audio_np, np.ndarray):
+                        audio_segments.append(audio_np)
+                    elif isinstance(audio_np, torch.Tensor):
+                        audio_segments.append(audio_np.cpu().numpy())
+                elif isinstance(audio_data, np.ndarray):
+                    audio_segments.append(audio_data)
+                elif isinstance(audio_data, torch.Tensor):
+                    audio_segments.append(audio_data.cpu().numpy())
+                else:
+                    print(f"Warning: Unexpected audio type: {type(audio_data)}")
 
         if not audio_segments:
             return {"error": "No audio generated. Please check the input text."}
 
-        # Concatenate all segments
-        audio = torch.cat(audio_segments, dim=-1)
+        # Concatenate all numpy segments
+        audio_np = np.concatenate(audio_segments, axis=0)
+        print(f"Concatenated audio shape: {audio_np.shape}, dtype: {audio_np.dtype}")
+
+        # Convert to tensor for processing
+        audio = torch.from_numpy(audio_np).float()
+
+        # Ensure 1D
+        if audio.dim() > 1:
+            audio = audio.squeeze()
+
+        # Get sample rate (from result or decoder model)
+        model_sample_rate = result_sample_rate or tts_engine.decoder_model.sample_rate
+        print(f"Model sample rate: {model_sample_rate}, target: {OUTPUT_SAMPLE_RATE}")
+
+        # Resample to output sample rate if needed
+        if model_sample_rate != OUTPUT_SAMPLE_RATE:
+            audio = audio.unsqueeze(0)  # Add channel dim for resample
+            audio = torchaudio.functional.resample(audio, model_sample_rate, OUTPUT_SAMPLE_RATE)
+            audio = audio.squeeze(0)
+
+        # Convert to int16
+        audio = (audio * AMPLITUDE).clamp(-32768, 32767).to(torch.int16)
 
         # Ensure correct shape for torchaudio (channels, samples)
         if audio.dim() == 1:
             audio = audio.unsqueeze(0)
-
-        # Get sample rate from decoder model
-        model_sample_rate = tts_engine.decoder_model.sample_rate
-
-        # Resample to output sample rate if needed
-        if model_sample_rate != OUTPUT_SAMPLE_RATE:
-            audio = audio.float()  # Resample needs float
-            audio = torchaudio.functional.resample(audio, model_sample_rate, OUTPUT_SAMPLE_RATE)
-            audio = audio.to(torch.int16)
 
         # Save to WAV bytes
         buffer = io.BytesIO()
