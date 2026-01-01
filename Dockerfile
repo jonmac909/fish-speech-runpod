@@ -11,6 +11,12 @@ WORKDIR /app
 # Install runpod and huggingface_hub into the venv using uv
 RUN uv pip install --python /app/.venv/bin/python runpod>=1.6.0 huggingface_hub
 
+# Download model weights at build time (not runtime)
+# This bakes the ~2GB model into the Docker image
+ARG HF_TOKEN
+ENV HF_TOKEN=${HF_TOKEN}
+RUN /app/.venv/bin/python -c "from huggingface_hub import snapshot_download; snapshot_download('fishaudio/openaudio-s1-mini', local_dir='/app/checkpoints/openaudio-s1-mini', token='${HF_TOKEN}')"
+
 # Copy handler
 COPY handler.py .
 
@@ -19,9 +25,6 @@ ENV CHECKPOINT_PATH=/app/checkpoints/openaudio-s1-mini
 ENV DECODER_CHECKPOINT=/app/checkpoints/openaudio-s1-mini/codec.pth
 ENV DECODER_CONFIG=modded_dac_vq
 ENV PYTHONUNBUFFERED=1
-
-# Note: Model weights should be mounted at runtime via RunPod volume
-# The fishaudio/fish-speech image expects checkpoints at /app/checkpoints
 
 # Override the base image's ENTRYPOINT (which runs run_webui.py)
 ENTRYPOINT []

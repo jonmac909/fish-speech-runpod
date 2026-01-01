@@ -27,24 +27,19 @@ import traceback
 import torch
 import torchaudio
 
-# Download model on cold start if not present
-def ensure_model_downloaded():
-    """Download model weights if not already present."""
+# Verify model is present (should be baked into Docker image)
+def verify_model_present():
+    """Verify model weights are present (baked into Docker image at build time)."""
     checkpoint_path = os.environ.get("CHECKPOINT_PATH", "/app/checkpoints/openaudio-s1-mini")
     if not os.path.exists(checkpoint_path) or not os.listdir(checkpoint_path):
-        print(f"Model not found at {checkpoint_path}, downloading...")
-        from huggingface_hub import snapshot_download
-        hf_token = os.environ.get("HF_TOKEN")
-        snapshot_download(
-            "fishaudio/openaudio-s1-mini",
-            local_dir=checkpoint_path,
-            token=hf_token
+        raise RuntimeError(
+            f"Model not found at {checkpoint_path}. "
+            "Model should be baked into Docker image during build. "
+            "Rebuild with: docker build --build-arg HF_TOKEN=your_token ."
         )
-        print("Model downloaded successfully!")
-    else:
-        print(f"Model already present at {checkpoint_path}")
+    print(f"Model present at {checkpoint_path}")
 
-ensure_model_downloaded()
+verify_model_present()
 
 # Fish Speech imports (after model download)
 from fish_speech.inference_engine import TTSInferenceEngine
