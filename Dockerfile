@@ -3,10 +3,13 @@
 
 FROM fishaudio/fish-speech:latest
 
+# Switch to root to install packages
+USER root
+
 WORKDIR /app
 
-# Install runpod (try pip first, fall back to uv)
-RUN pip install --no-cache-dir runpod>=1.6.0 || uv pip install --system runpod>=1.6.0
+# Install runpod and huggingface_hub into the venv using uv
+RUN uv pip install --python /app/.venv/bin/python runpod>=1.6.0 huggingface_hub
 
 # Copy handler
 COPY handler.py .
@@ -17,8 +20,11 @@ ENV DECODER_CHECKPOINT=/app/checkpoints/openaudio-s1-mini/codec.pth
 ENV DECODER_CONFIG=modded_dac_vq
 ENV PYTHONUNBUFFERED=1
 
-# Download model weights (if not already in base image)
-RUN python -c "from huggingface_hub import snapshot_download; snapshot_download('fishaudio/openaudio-s1-mini', local_dir='/app/checkpoints/openaudio-s1-mini')" || echo "Model download skipped (may already exist)"
+# Note: Model weights should be mounted at runtime via RunPod volume
+# The fishaudio/fish-speech image expects checkpoints at /app/checkpoints
 
-# Run handler
-CMD ["python", "-u", "handler.py"]
+# Override the base image's ENTRYPOINT (which runs run_webui.py)
+ENTRYPOINT []
+
+# Run handler using the venv Python (where torch is installed)
+CMD ["/app/.venv/bin/python", "-u", "handler.py"]

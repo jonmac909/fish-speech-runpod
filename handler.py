@@ -27,7 +27,26 @@ import traceback
 import torch
 import torchaudio
 
-# Fish Speech imports
+# Download model on cold start if not present
+def ensure_model_downloaded():
+    """Download model weights if not already present."""
+    checkpoint_path = os.environ.get("CHECKPOINT_PATH", "/app/checkpoints/openaudio-s1-mini")
+    if not os.path.exists(checkpoint_path) or not os.listdir(checkpoint_path):
+        print(f"Model not found at {checkpoint_path}, downloading...")
+        from huggingface_hub import snapshot_download
+        hf_token = os.environ.get("HF_TOKEN")
+        snapshot_download(
+            "fishaudio/openaudio-s1-mini",
+            local_dir=checkpoint_path,
+            token=hf_token
+        )
+        print("Model downloaded successfully!")
+    else:
+        print(f"Model already present at {checkpoint_path}")
+
+ensure_model_downloaded()
+
+# Fish Speech imports (after model download)
 from fish_speech.inference_engine import TTSInferenceEngine
 from fish_speech.models.dac.modded_dac import ModdedDACModel
 from fish_speech.models.text2semantic.inference import launch_thread_safe_queue
