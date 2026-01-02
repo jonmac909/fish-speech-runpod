@@ -7,7 +7,11 @@ Compatible with the existing HistoryGen AI audio generation pipeline.
 Input format (same as ChatterboxTTS):
 {
     "text": "The text to synthesize",
-    "reference_audio_base64": "base64 encoded audio for voice cloning"
+    "reference_audio_base64": "base64 encoded audio for voice cloning",
+    "emotion_marker": "(sincere) (soft tone)",  # Optional emotion/tone marker
+    "temperature": 0.9,  # Optional: 0.1-1.0, higher = more expressive
+    "top_p": 0.85,  # Optional: 0.1-1.0, higher = more variation
+    "repetition_penalty": 1.1  # Optional: 0.9-2.0, higher = less repetition
 }
 
 Output format:
@@ -179,6 +183,19 @@ def handler(job):
 
         print(f"Generating TTS for {len(text)} characters...")
 
+        # Extract TTS settings from input (with defaults)
+        emotion_marker = job_input.get("emotion_marker", NARRATION_STYLE)
+        temperature = job_input.get("temperature", 0.9)
+        top_p = job_input.get("top_p", 0.85)
+        repetition_penalty = job_input.get("repetition_penalty", 1.1)
+
+        # Validate and clamp settings
+        temperature = max(0.1, min(1.0, float(temperature)))
+        top_p = max(0.1, min(1.0, float(top_p)))
+        repetition_penalty = max(0.9, min(2.0, float(repetition_penalty)))
+
+        print(f"TTS settings: emotion='{emotion_marker}', temp={temperature}, top_p={top_p}, rep_penalty={repetition_penalty}")
+
         # Process reference audio for voice cloning
         references = []
         reference_audio_base64 = job_input.get("reference_audio_base64")
@@ -208,19 +225,19 @@ def handler(job):
         # Add emotion markers for expressive narration
         # Fish Speech supports markers like (excited), (soft tone), (sincere) etc.
         # We prepend style markers to make documentary narration more engaging
-        styled_text = f"{NARRATION_STYLE} {text}"
+        if emotion_marker and emotion_marker.strip():
+            styled_text = f"{emotion_marker} {text}"
+        else:
+            styled_text = text
         print(f"Styled text: {styled_text[:100]}...")
 
-        # Build TTS request
-        # Higher temperature = more expressive, varied intonation
-        # Lower repetition_penalty = more natural flow (1.1 is default)
-        # No fixed seed = natural variation between generations
+        # Build TTS request using extracted settings
         request = ServeTTSRequest(
             text=styled_text,
             references=references,
-            temperature=0.9,       # Higher for more expressive speech (default 0.8)
-            top_p=0.85,            # Slightly higher for more variation
-            repetition_penalty=1.1, # Default - prevents repetition without over-constraining
+            temperature=temperature,
+            top_p=top_p,
+            repetition_penalty=repetition_penalty,
             max_new_tokens=2048,
             normalize=True,
             format="wav",
