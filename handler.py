@@ -63,6 +63,12 @@ MIN_REFERENCE_DURATION = 3.0
 OUTPUT_SAMPLE_RATE = 24000
 AMPLITUDE = 32768  # Scale for 16-bit PCM
 
+# Emotion/tone markers for expressive speech
+# These are prepended to text to make Fish Speech output more natural and engaging
+# See: https://speech.fish.audio/ for full list
+DEFAULT_EMOTION_MARKER = "(engaging)"  # General marker for documentary narration
+NARRATION_STYLE = "(sincere) (soft tone)"  # Warm, documentary-style delivery
+
 # Global engine instance
 tts_engine = None
 
@@ -199,20 +205,27 @@ def handler(job):
                 # Continue without voice cloning
                 references = []
 
+        # Add emotion markers for expressive narration
+        # Fish Speech supports markers like (excited), (soft tone), (sincere) etc.
+        # We prepend style markers to make documentary narration more engaging
+        styled_text = f"{NARRATION_STYLE} {text}"
+        print(f"Styled text: {styled_text[:100]}...")
+
         # Build TTS request
-        # Fixed seed for deterministic output (0 = random, any other = deterministic)
-        # Lower temperature and top_p for more consistent voice/accent
+        # Higher temperature = more expressive, varied intonation
+        # Lower repetition_penalty = more natural flow (1.1 is default)
+        # No fixed seed = natural variation between generations
         request = ServeTTSRequest(
-            text=text,
+            text=styled_text,
             references=references,
-            temperature=0.5,
-            top_p=0.7,
-            repetition_penalty=1.2,
+            temperature=0.9,       # Higher for more expressive speech (default 0.8)
+            top_p=0.85,            # Slightly higher for more variation
+            repetition_penalty=1.1, # Default - prevents repetition without over-constraining
             max_new_tokens=2048,
             normalize=True,
             format="wav",
-            chunk_length=300,  # Larger chunks = fewer transitions
-            seed=42,  # Fixed seed for consistent voice
+            chunk_length=200,      # Default chunk size for better prosody
+            seed=None,             # Random seed for natural variation
         )
 
         # Generate audio using inference engine
